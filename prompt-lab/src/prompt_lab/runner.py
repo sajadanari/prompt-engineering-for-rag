@@ -13,6 +13,7 @@ from rich.table import Table
 from .assembler import assemble_messages
 from .client import ChatResult, ProviderClient, describe_api_error
 from .config import Config
+from .intent_router import route_intent
 from .logging_util import RunEntry, RunLog, write_run_log
 
 console = Console()
@@ -58,6 +59,44 @@ def run_single(
     show_prompt: bool = False,
 ) -> ChatResult:
     """Assemble, send, and display one question."""
+    routed = route_intent(question)
+    if routed is not None:
+        result = ChatResult(
+            text=routed.text,
+            model=f"intent-router:{routed.intent}",
+            prompt_tokens=0,
+            completion_tokens=0,
+            used_fallback_key=False,
+            finish_reason="stop",
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": f"[intent-router] handled as {routed.intent}; RAG pipeline skipped.",
+            },
+            {"role": "user", "content": question},
+        ]
+        log_path = write_run_log(
+            RunLog(
+                command="run",
+                config=config,
+                include_context=False,
+                entries=[
+                    RunEntry(
+                        question=question,
+                        messages=messages,
+                        result=result,
+                        elapsed=0.0,
+                        note=f"pre-RAG route: {routed.intent}",
+                    )
+                ],
+            )
+        )
+        if show_prompt:
+            print_messages(messages)
+        _print_result(result, 0.0, log_path=log_path)
+        return result
+
     messages = assemble_messages(config, question, include_context=include_context)
     if show_prompt:
         print_messages(messages)
@@ -130,6 +169,38 @@ def run_batch(config: Config, include_context: bool = True) -> None:
         question = item["q"] if isinstance(item, dict) else str(item)
         note = item.get("note", "") if isinstance(item, dict) else ""
         console.print(f"[dim]({i}/{len(questions)}) {question}[/dim]")
+
+        routed = route_intent(question)
+        if routed is not None:
+            result = ChatResult(
+                text=routed.text,
+                model=f"intent-router:{routed.intent}",
+                prompt_tokens=0,
+                completion_tokens=0,
+                used_fallback_key=False,
+                finish_reason="stop",
+            )
+            messages = [
+                {
+                    "role": "system",
+                    "content": f"[intent-router] handled as {routed.intent}; RAG pipeline skipped.",
+                },
+                {"role": "user", "content": question},
+            ]
+            answer = result.text
+            tokens = "0/0"
+            entries.append(
+                RunEntry(
+                    question=question,
+                    messages=messages,
+                    note=f"{note} | pre-RAG route: {routed.intent}".strip(" |"),
+                    result=result,
+                    elapsed=0.0,
+                )
+            )
+            label = f"{question}\n[dim italic]{note}[/dim italic]" if note else question
+            table.add_row(str(i), label, answer, tokens)
+            continue
 
         messages = assemble_messages(config, question, include_context=include_context)
         start = time.monotonic()

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from openai import APIStatusError, AuthenticationError, OpenAI
 
 from .config import Config
+from .output_guard import sanitize_output
 
 
 @dataclass
@@ -63,8 +64,9 @@ class ProviderClient:
 
         usage = getattr(response, "usage", None)
         choice = response.choices[0]
+        guarded = sanitize_output(choice.message.content or "")
         return ChatResult(
-            text=choice.message.content or "",
+            text=guarded.text,
             model=response.model or self.config.model,
             prompt_tokens=getattr(usage, "prompt_tokens", None),
             completion_tokens=getattr(usage, "completion_tokens", None),
