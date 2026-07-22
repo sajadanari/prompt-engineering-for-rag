@@ -13,10 +13,12 @@ dependencies = [
     "rich>=13.7",
     "PyYAML>=6.0",
     "python-dotenv>=1.0",
+    "PySide6-Essentials>=6.6",
 ]
 
 [project.scripts]
 prompt-lab = "prompt_lab.cli:app"
+prompt-lab-gui = "prompt_lab.gui.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

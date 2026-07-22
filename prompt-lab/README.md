@@ -52,6 +52,21 @@ prompt-lab batch
 
 Then open `workspace/`, edit any file, and re-run. That loop — **edit → run → observe** — is the whole tool.
 
+## Desktop GUI
+
+A PySide6 window wraps the same core (assemble / run / batch / logs) without blocking the UI during API calls.
+
+```powershell
+# from prompt-lab/ with the venv active (after pip install -e .)
+prompt-lab-gui
+# or:
+python -m prompt_lab.gui
+```
+
+Use the toolbar to pick language/model and toggle context, edit workspace files in the left tabs, then **Show prompt**, **Run**, or **Batch**. Editors are saved to disk before each action. Logs appear under the **Logs** tab (same `logs/*.md` files as the CLI).
+
+---
+
 ## Run logs
 
 Every `run` and `batch` that hits the API writes a Markdown log under `logs/` (gitignored — never committed):

@@ -53,7 +53,8 @@ def _render_messages(messages: list[dict]) -> str:
     for message in messages:
         role = message.get("role", "unknown")
         content = message.get("content") or ""
-        parts.append(f"### {role}\n\n```text\n{content}\n```")
+        # Fenced so nested Markdown in prompts stays literal; GUI wraps long lines.
+        parts.append(f"### {role}\n\n```text\n{content.rstrip()}\n```")
     return "\n\n".join(parts)
 
 
@@ -68,24 +69,41 @@ def _render_entry(entry: RunEntry, index: int | None = None) -> str:
     if entry.error:
         blocks.extend(["", "## Error", "", f"```text\n{entry.error}\n```"])
     else:
-        response = entry.result.text if entry.result else ""
-        blocks.extend(["", "## Response", "", f"```text\n{response}\n```"])
+        response = (entry.result.text if entry.result else "").rstrip()
+        blocks.extend(["", "## Response", "", response or "_(empty)_"])
 
     if entry.result is not None:
         r = entry.result
+        detail_rows = [
+            ("model", r.model),
+            ("tokens", f"{r.prompt_tokens} in / {r.completion_tokens} out"),
+            ("finish_reason", r.finish_reason),
+            ("used_fallback_key", r.used_fallback_key),
+        ]
+        if entry.elapsed is not None:
+            detail_rows.append(("elapsed", f"{entry.elapsed:.1f}s"))
         blocks.extend(
             [
                 "",
                 "## Result details",
                 "",
-                f"- model: `{r.model}`",
-                f"- tokens: {r.prompt_tokens} in / {r.completion_tokens} out",
-                f"- finish_reason: `{r.finish_reason}`",
-                f"- used_fallback_key: {r.used_fallback_key}",
+                "| Field | Value |",
+                "|---|---|",
             ]
         )
-    if entry.elapsed is not None:
-        blocks.append(f"- elapsed: {entry.elapsed:.1f}s")
+        for key, value in detail_rows:
+            blocks.append(f"| {key} | {_md_escape_cell(value)} |")
+    elif entry.elapsed is not None:
+        blocks.extend(
+            [
+                "",
+                "## Result details",
+                "",
+                "| Field | Value |",
+                "|---|---|",
+                f"| elapsed | {entry.elapsed:.1f}s |",
+            ]
+        )
 
     return "\n".join(blocks)
 
