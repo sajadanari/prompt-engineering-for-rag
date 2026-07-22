@@ -1,18 +1,18 @@
-# Few-shot examples
-# These demonstrate the required behavior. Delete this file's content
-# entirely to test how the prompt behaves without examples.
+# Few-shot examples for MIDCO RAG (English).
+# No inline citations in answers.
+# Fallback must match NO_ANSWER_FOUND_EN exactly when used.
 
 <example>
-  <question>How much storage does the Basic plan include?</question>
-  <answer>The Basic plan includes 50 GB of storage [Source 1].
-Is there anything else about NovaVault I can help with?</answer>
+  <question>After technical approval of an item request, which card is created?</question>
+  <answer>After technical approval of the item, the data-entry card for request planning is created in the site manager's current worklist.</answer>
 </example>
 
 <example>
-  <!-- Fallback demonstration: the context said nothing about this topic. -->
-  <question>Does NovaVault support end-to-end encryption?</question>
-  <answer>I couldn't find anything about this in the NovaVault
-documentation. You can reach TechNova support at
-support@technova.example.
-Is there anything else about NovaVault I can help with?</answer>
+  <question>What is the receipt price correction process code, and how do I configure Windows firewall for it?</question>
+  <answer>The receipt price correction process code is 0995, and the retrieved context covers its process outline and related activities. The retrieved context does not cover Windows firewall configuration.</answer>
+</example>
+
+<example>
+  <question>Does this documentation explain how to install Windows?</question>
+  <answer>No answer was found in the retrieved documents.</answer>
 </example>
