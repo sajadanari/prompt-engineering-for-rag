@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Secrets — API keys never enter git
+.env
+prompt-lab/.env
+
+# User-editable prompt workspace (created by `prompt-lab init`)
+prompt-lab/workspace/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db

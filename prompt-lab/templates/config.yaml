@@ -1,0 +1,36 @@
+# prompt-lab configuration
+# This file lives in workspace/ and is YOURS to edit — it is gitignored.
+
+provider:
+  # Any OpenAI-compatible endpoint works. To switch providers, change
+  # base_url + api_key_env (and put the key in .env).
+  #   OpenAI:      https://api.openai.com/v1
+  #   AvalAI:      https://api.avalai.ir/v1
+  #   OpenRouter:  https://openrouter.ai/api/v1
+  #   Local Ollama: http://localhost:11434/v1
+  base_url: "https://api.avalai.ir/v1"
+
+  # Name of the environment variable (in .env) that holds the API key.
+  # A "<name>_FALLBACK" variable, if set, is tried automatically on auth failure.
+  api_key_env: "AVALAI_API_KEY"
+
+  # Default model. Override per run with:  prompt-lab run -m <model> "..."
+  model: "gpt-5-mini"
+
+# Which prompt/context set to use: "en" or "fa".
+# Override per run with:  prompt-lab run -l fa "..."
+language: "en"
+
+generation:
+  # Leave temperature unset (null) for models that only support the default.
+  temperature: null
+  # Note: reasoning models (gpt-5 family, o-series) spend part of this
+  # budget on internal reasoning — keep it generous or answers get cut off.
+  max_tokens: 4000
+  # Extra raw parameters passed to the chat completions call, e.g.:
+  # extra_params:
+  #   top_p: 0.9
+  extra_params: {}
+
+# HTTP timeout in seconds.
+request_timeout: 120
