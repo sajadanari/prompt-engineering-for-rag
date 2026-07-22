@@ -12,6 +12,9 @@ prompt-lab/.env
 # User-editable prompt workspace (created by `prompt-lab init`)
 prompt-lab/workspace/
 
+# Test run logs (full prompts + answers; created by run/batch)
+prompt-lab/logs/
+
 # OS / editor noise
 .DS_Store
 Thumbs.db

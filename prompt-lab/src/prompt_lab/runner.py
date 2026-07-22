@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import yaml
 from rich.console import Console
@@ -12,6 +13,7 @@ from rich.table import Table
 from .assembler import assemble_messages
 from .client import ChatResult, ProviderClient, describe_api_error
 from .config import Config
+from .logging_util import RunEntry, RunLog, write_run_log
 
 console = Console()
 
@@ -29,7 +31,7 @@ def print_messages(messages: list[dict]) -> None:
         )
 
 
-def _print_result(result: ChatResult, elapsed: float) -> None:
+def _print_result(result: ChatResult, elapsed: float, log_path: Path | None = None) -> None:
     console.print(Panel(result.text, title="[bold]RESPONSE[/bold]", border_style="magenta"))
     meta = (
         f"model: [bold]{result.model}[/bold]  |  "
@@ -39,6 +41,8 @@ def _print_result(result: ChatResult, elapsed: float) -> None:
     if result.used_fallback_key:
         meta += "  |  [yellow]fallback API key used[/yellow]"
     console.print(meta)
+    if log_path is not None:
+        console.print(f"[dim]log: {log_path}[/dim]")
     if not result.text.strip() and result.finish_reason == "length":
         console.print(
             "[yellow]Empty response: the token budget was exhausted before any "
@@ -62,10 +66,45 @@ def run_single(
     start = time.monotonic()
     try:
         result = client.chat(messages)
+        elapsed = time.monotonic() - start
     except Exception as exc:  # surface a short, actionable message
-        console.print(f"[red]Request failed:[/red] {describe_api_error(exc)}")
+        elapsed = time.monotonic() - start
+        error = describe_api_error(exc)
+        log_path = write_run_log(
+            RunLog(
+                command="run",
+                config=config,
+                include_context=include_context,
+                entries=[
+                    RunEntry(
+                        question=question,
+                        messages=messages,
+                        error=error,
+                        elapsed=elapsed,
+                    )
+                ],
+            )
+        )
+        console.print(f"[red]Request failed:[/red] {error}")
+        console.print(f"[dim]log: {log_path}[/dim]")
         raise SystemExit(1)
-    _print_result(result, time.monotonic() - start)
+
+    log_path = write_run_log(
+        RunLog(
+            command="run",
+            config=config,
+            include_context=include_context,
+            entries=[
+                RunEntry(
+                    question=question,
+                    messages=messages,
+                    result=result,
+                    elapsed=elapsed,
+                )
+            ],
+        )
+    )
+    _print_result(result, elapsed, log_path=log_path)
     return result
 
 
@@ -85,21 +124,54 @@ def run_batch(config: Config, include_context: bool = True) -> None:
     table.add_column("Response", max_width=70)
     table.add_column("Tokens", width=12)
 
+    entries: list[RunEntry] = []
+
     for i, item in enumerate(questions, start=1):
         question = item["q"] if isinstance(item, dict) else str(item)
         note = item.get("note", "") if isinstance(item, dict) else ""
         console.print(f"[dim]({i}/{len(questions)}) {question}[/dim]")
 
         messages = assemble_messages(config, question, include_context=include_context)
+        start = time.monotonic()
         try:
             result = client.chat(messages)
+            elapsed = time.monotonic() - start
             answer = result.text
             tokens = f"{result.prompt_tokens}/{result.completion_tokens}"
+            entries.append(
+                RunEntry(
+                    question=question,
+                    messages=messages,
+                    note=note,
+                    result=result,
+                    elapsed=elapsed,
+                )
+            )
         except Exception as exc:
-            answer = f"[red]ERROR: {describe_api_error(exc)}[/red]"
+            elapsed = time.monotonic() - start
+            error = describe_api_error(exc)
+            answer = f"[red]ERROR: {error}[/red]"
             tokens = "-"
+            entries.append(
+                RunEntry(
+                    question=question,
+                    messages=messages,
+                    note=note,
+                    error=error,
+                    elapsed=elapsed,
+                )
+            )
 
         label = f"{question}\n[dim italic]{note}[/dim italic]" if note else question
         table.add_row(str(i), label, answer, tokens)
 
+    log_path = write_run_log(
+        RunLog(
+            command="batch",
+            config=config,
+            include_context=include_context,
+            entries=entries,
+        )
+    )
     console.print(table)
+    console.print(f"[dim]log: {log_path}[/dim]")

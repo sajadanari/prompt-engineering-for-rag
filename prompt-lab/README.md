@@ -52,6 +52,17 @@ prompt-lab batch
 
 Then open `workspace/`, edit any file, and re-run. That loop — **edit → run → observe** — is the whole tool.
 
+## Run logs
+
+Every `run` and `batch` that hits the API writes a Markdown log under `logs/` (gitignored — never committed):
+
+- Single run: `logs/YYYYMMDD-HHMMSS-run.md`
+- Batch: `logs/YYYYMMDD-HHMMSS-batch.md` (all questions in one file)
+
+Each log includes timestamp, model, language, base_url, generation settings, whether context was included, the **full assembled prompt** (system + user messages), the **model response** (or error), tokens, finish reason, and elapsed time. API keys are never written.
+
+`show-prompt` does **not** create a log (dry run, no API call). The console prints the log path after each `run` / `batch`.
+
 ---
 
 ## How It Works
@@ -200,8 +211,10 @@ prompt-lab/
     context.py      # context.yaml -> XML <context> rendering
     assembler.py    # message assembly (system + few-shot + context + reminder + question)
     runner.py       # execution + rich output
+    logging_util.py # Markdown run/batch logs under logs/
     workspace.py    # template copying
   templates/        # git-tracked samples (en/ + fa/) — never edited in place
   workspace/        # YOUR editable copies (gitignored, created by init)
+  logs/             # run/batch Markdown logs (gitignored)
   .env              # YOUR keys (gitignored)
 ```
