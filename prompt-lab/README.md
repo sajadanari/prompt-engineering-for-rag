@@ -4,7 +4,7 @@ A command-line lab for **testing and iterating on RAG prompts** against any Open
 
 Retrieval is **simulated by design**: there is no vector database and no semantic search. The chunks in `context.yaml` *are* the "search results" — as if retrieval already happened. This isolates the variable you are actually testing: **the prompt**.
 
-The prompt structure (system message → few-shot → XML `<context>` → `<reminder>` → `<question>`) follows the companion article in [`../article/`](../article/README.md), which explains the reasoning behind every block. Prompt sections themselves are XML-tagged (`<identity>`, `<grounding_rules>`, …) per vendor guidance on structured delimiters.
+The prompt structure is a single root `<prompt>` with four sections — `<system>` → `<context>` → `<reminder>` → `<user>` — matching vendor XML-delimiter guidance and the companion article in [`../article/`](../article/README.md).
 
 ---
 
@@ -74,7 +74,7 @@ Every `run` and `batch` that hits the API writes a Markdown log under `logs/` (g
 - Single run: `logs/YYYYMMDD-HHMMSS-run.md`
 - Batch: `logs/YYYYMMDD-HHMMSS-batch.md` (all questions in one file)
 
-Each log includes timestamp, model, language, base_url, generation settings, whether context was included, the **full assembled prompt** (system + user messages), the **model response** (or error), tokens, finish reason, and elapsed time. API keys are never written.
+Each log includes timestamp, model, language, base_url, generation settings, whether context was included, the **full assembled prompt** (single user message wrapped in `<prompt>`), the **model response** (or error), tokens, finish reason, and elapsed time. API keys are never written.
 
 `show-prompt` does **not** create a log (dry run, no API call). The console prints the log path after each `run` / `batch`.
 
@@ -84,18 +84,27 @@ Each log includes timestamp, model, language, base_url, generation settings, whe
 
 ```text
 workspace/en/system_prompt.xml ─┐
-workspace/en/few_shot.xml ──────┤→  system message (XML-tagged sections)
-                                │
-workspace/en/context.yaml ──────┤→  <context> XML block   ┐
-workspace/en/reminder.xml ──────┤→  <reminder>            ├→ user message
-your question ──────────────────┘→  <question>…</question>┘
+workspace/en/few_shot.xml ──────┤→  <system>
+workspace/en/context.yaml ──────┤→  <context>
+workspace/en/reminder.xml ──────┤→  <reminder>
+your question ──────────────────┘→  <user>
+                                          │
+                                          ▼
+                              <prompt>
+                                <system>…</system>
+                                <context>…</context>
+                                <reminder>…</reminder>
+                                <user>…</user>
+                              </prompt>
                                           │
                                           ▼
                               POST {base_url}/chat/completions
+                              (single user message)
 ```
 
-- Prompt blocks use XML tags (`<identity>`, `<grounding_rules>`, `<examples>`, `<reminder>`, …) so the model can reliably distinguish instruction categories — matching Anthropic/OpenAI delimiter guidance.
-- Chunks from `context.yaml` are rendered as `<document id= title= type= date= ...>` blocks, in file order (order = injection order, so you can experiment with chunk positioning).
+- The assembled payload is always one root `<prompt>` with sections in RAG order: instructions (`<system>`), evidence (`<context>`), reinforcement (`<reminder>`), live query (`<user>` last).
+- Inside `<system>`, nested XML tags (`<identity>`, `<grounding_rules>`, `<examples>`, …) label instruction categories.
+- Chunks from `context.yaml` are rendered as `<document id= title= type= date= ...>` blocks inside `<context>`, in file order (order = injection order).
 - Chunk text and the live question are XML-escaped so they can never break out of their tags.
 - An empty or missing `few_shot.xml` / `reminder.xml` simply skips that block — delete their contents to A/B test their effect.
 
@@ -107,7 +116,7 @@ Created by `prompt-lab init`; gitignored, yours to break and rebuild (`init --fo
 |---|---|
 | `workspace/config.yaml` | Provider, model, language, generation parameters |
 | `workspace/<lang>/system_prompt.xml` | The system message (grounding rules, citations, fallback, scope…) |
-| `workspace/<lang>/few_shot.xml` | Behavior demonstrations appended to the system message (optional) |
+| `workspace/<lang>/few_shot.xml` | Behavior demonstrations included in the assembled `<prompt>` (optional) |
 | `workspace/<lang>/context.yaml` | Simulated retrieved chunks with metadata |
 | `workspace/<lang>/reminder.xml` | Reinforcement block placed after the context (optional) |
 | `workspace/<lang>/questions.yaml` | Question set for `prompt-lab batch` |
@@ -225,7 +234,7 @@ prompt-lab/
     config.py       # config.yaml + .env loading
     client.py       # OpenAI-compatible client with key fallback
     context.py      # context.yaml -> XML <context> rendering
-    assembler.py    # message assembly (system + few-shot + context + reminder + question)
+    assembler.py    # message assembly → single <prompt>-wrapped user message
     runner.py       # execution + rich output
     logging_util.py # Markdown run/batch logs under logs/
     workspace.py    # template copying

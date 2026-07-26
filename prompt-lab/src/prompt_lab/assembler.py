@@ -1,8 +1,13 @@
 """Assemble the final message list from the workspace files.
 
-Layout follows the canonical RAG prompt order (see the article in ../article/):
-  system message (+ optional few-shot examples)  -> "system" role
-  <context> block + <reminder> + <question>      -> "user" role
+Canonical RAG layout sent as a single user message:
+
+  <prompt>
+    <system>…system_prompt + optional few-shot…</system>
+    <context>…retrieved documents…</context>
+    <reminder>…optional reinforcement…</reminder>
+    <user>…live question…</user>
+  </prompt>
 """
 
 from __future__ import annotations
@@ -21,6 +26,19 @@ def _read_optional(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
+def _unwrap_tag(text: str, tag: str) -> str:
+    """Strip a single outer <tag>…</tag> if the file already wraps itself."""
+    text = text.strip()
+    open_t, close_t = f"<{tag}>", f"</{tag}>"
+    if text.startswith(open_t) and text.endswith(close_t):
+        return text[len(open_t) : -len(close_t)].strip()
+    return text
+
+
+def _wrap_section(tag: str, body: str) -> str:
+    return f"<{tag}>\n{body.strip()}\n</{tag}>"
+
+
 def assemble_messages(
     config: Config,
     question: str,
@@ -32,20 +50,26 @@ def assemble_messages(
             f"System prompt is missing or empty: {config.lang_file('system_prompt')}"
         )
 
+    system_parts = [_unwrap_tag(system_prompt, "system")]
     few_shot = _read_optional(config.lang_file("few_shot"))
     if few_shot:
-        system_prompt = f"{system_prompt}\n\n{few_shot}"
+        system_parts.append(few_shot)
 
     chunks = load_chunks(config.lang_file("context")) if include_context else []
-    context_block = render_context_block(chunks)
+    context_block = render_context_block(chunks)  # already <context>…</context>
 
-    user_parts = [context_block]
+    sections = [
+        _wrap_section("system", "\n\n".join(system_parts)),
+        context_block,
+    ]
+
     reminder = _read_optional(config.lang_file("reminder"))
     if reminder:
-        user_parts.append(reminder)
-    user_parts.append(f"<question>\n{escape(question)}\n</question>")
+        sections.append(_wrap_section("reminder", _unwrap_tag(reminder, "reminder")))
 
+    sections.append(_wrap_section("user", escape(question)))
+
+    body = "\n\n".join(sections)
     return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": "\n\n".join(user_parts)},
+        {"role": "user", "content": f"<prompt>\n{body}\n</prompt>"},
     ]
