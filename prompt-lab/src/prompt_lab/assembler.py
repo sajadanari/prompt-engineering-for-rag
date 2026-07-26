@@ -2,12 +2,13 @@
 
 Layout follows the canonical RAG prompt order (see the article in ../article/):
   system message (+ optional few-shot examples)  -> "system" role
-  <context> block + reminder + question          -> "user" role
+  <context> block + <reminder> + <question>      -> "user" role
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from .config import Config
 from .context import load_chunks, render_context_block
@@ -42,7 +43,7 @@ def assemble_messages(
     reminder = _read_optional(config.lang_file("reminder"))
     if reminder:
         user_parts.append(reminder)
-    user_parts.append(f"Question: {question}")
+    user_parts.append(f"<question>\n{escape(question)}\n</question>")
 
     return [
         {"role": "system", "content": system_prompt},

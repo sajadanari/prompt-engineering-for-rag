@@ -38,9 +38,9 @@ from .worker import ApiWorker
 
 
 EDITOR_KEYS = (
-    ("system_prompt", "system_prompt.md"),
-    ("few_shot", "few_shot.md"),
-    ("reminder", "reminder.md"),
+    ("system_prompt", "system_prompt.xml"),
+    ("few_shot", "few_shot.xml"),
+    ("reminder", "reminder.xml"),
     ("context", "context.yaml"),
     ("questions", "questions.yaml"),
 )

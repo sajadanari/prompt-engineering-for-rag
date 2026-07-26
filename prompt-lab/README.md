@@ -4,7 +4,7 @@ A command-line lab for **testing and iterating on RAG prompts** against any Open
 
 Retrieval is **simulated by design**: there is no vector database and no semantic search. The chunks in `context.yaml` *are* the "search results" — as if retrieval already happened. This isolates the variable you are actually testing: **the prompt**.
 
-The prompt structure (system message → few-shot → XML `<context>` → reminder → question) follows the companion article in [`../article/`](../article/README.md), which explains the reasoning behind every block.
+The prompt structure (system message → few-shot → XML `<context>` → `<reminder>` → `<question>`) follows the companion article in [`../article/`](../article/README.md), which explains the reasoning behind every block. Prompt sections themselves are XML-tagged (`<identity>`, `<grounding_rules>`, …) per vendor guidance on structured delimiters.
 
 ---
 
@@ -83,20 +83,21 @@ Each log includes timestamp, model, language, base_url, generation settings, whe
 ## How It Works
 
 ```text
-workspace/en/system_prompt.md ──┐
-workspace/en/few_shot.md ───────┤→  system message
+workspace/en/system_prompt.xml ─┐
+workspace/en/few_shot.xml ──────┤→  system message (XML-tagged sections)
                                 │
 workspace/en/context.yaml ──────┤→  <context> XML block   ┐
-workspace/en/reminder.md ───────┤→  reminder text          ├→ user message
-your question ──────────────────┘→  "Question: ..."        ┘
+workspace/en/reminder.xml ──────┤→  <reminder>            ├→ user message
+your question ──────────────────┘→  <question>…</question>┘
                                           │
                                           ▼
                               POST {base_url}/chat/completions
 ```
 
+- Prompt blocks use XML tags (`<identity>`, `<grounding_rules>`, `<examples>`, `<reminder>`, …) so the model can reliably distinguish instruction categories — matching Anthropic/OpenAI delimiter guidance.
 - Chunks from `context.yaml` are rendered as `<document id= title= type= date= ...>` blocks, in file order (order = injection order, so you can experiment with chunk positioning).
-- Chunk text is XML-escaped so it can never break out of the `<context>` block.
-- An empty or missing `few_shot.md` / `reminder.md` simply skips that block — delete their contents to A/B test their effect.
+- Chunk text and the live question are XML-escaped so they can never break out of their tags.
+- An empty or missing `few_shot.xml` / `reminder.xml` simply skips that block — delete their contents to A/B test their effect.
 
 ## Workspace Files (what you edit)
 
@@ -105,10 +106,10 @@ Created by `prompt-lab init`; gitignored, yours to break and rebuild (`init --fo
 | File | Role |
 |---|---|
 | `workspace/config.yaml` | Provider, model, language, generation parameters |
-| `workspace/<lang>/system_prompt.md` | The system message (grounding rules, citations, fallback, scope…) |
-| `workspace/<lang>/few_shot.md` | Behavior demonstrations appended to the system message (optional) |
+| `workspace/<lang>/system_prompt.xml` | The system message (grounding rules, citations, fallback, scope…) |
+| `workspace/<lang>/few_shot.xml` | Behavior demonstrations appended to the system message (optional) |
 | `workspace/<lang>/context.yaml` | Simulated retrieved chunks with metadata |
-| `workspace/<lang>/reminder.md` | Reinforcement block placed after the context (optional) |
+| `workspace/<lang>/reminder.xml` | Reinforcement block placed after the context (optional) |
 | `workspace/<lang>/questions.yaml` | Question set for `prompt-lab batch` |
 
 `<lang>` is `en` or `fa` — both ship with complete samples, including a **conflicting-sources pair** (old vs. new pricing) and a **poisoned chunk** (injection probe) so you can test the hard cases immediately.
@@ -194,11 +195,11 @@ Anything speaking the OpenAI chat-completions protocol works: OpenAI, AvalAI, Op
 
 The sample templates are built to make the interesting failures reproducible:
 
-- **Grounding:** delete the `## Grounding rules` block from `system_prompt.md`, then ask about two-factor authentication (not in context) — watch the model start guessing.
-- **Fallback:** run with `--no-context` before and after removing the fallback procedures.
-- **Conflicting sources:** ask "How much does the Pro plan cost?" — chunks 1 and 4 disagree ($12 in 2026 vs $10 in 2025). Remove the `## Conflicting sources` block and compare.
-- **Prompt injection:** ask "How do I change my backup schedule?" — chunk 5 is a poisoned ticket. Remove the `## Untrusted content policy` and `reminder.md` and see if the model stays safe.
-- **Few-shot value:** empty `few_shot.md` and re-run the batch — compare fallback consistency.
+- **Grounding:** delete the `<grounding_rules>` block from `system_prompt.xml`, then ask about two-factor authentication (not in context) — watch the model start guessing.
+- **Fallback:** run with `--no-context` before and after removing the `<fallback_procedures>` block.
+- **Conflicting sources:** ask a question whose chunks disagree; remove or weaken the conflict-handling lines inside `<context_structure>` and compare.
+- **Prompt injection:** ask a question that hits a poisoned chunk. Remove the `<untrusted_content_policy>` block and `<reminder>` and see if the model stays safe.
+- **Few-shot value:** empty `few_shot.xml` and re-run the batch — compare fallback consistency.
 - **Chunk ordering:** reorder `context.yaml` entries to move the relevant chunk into the middle; observe *Lost in the Middle* effects on long contexts.
 
 Each experiment maps to a part of the [companion article](../article/README.md), which explains the *why*.
